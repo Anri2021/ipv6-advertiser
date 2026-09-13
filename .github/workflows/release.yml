@@ -1,0 +1,33 @@
+name: CI/CD Build and Release
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - 'v*' # יפעיל את ההפצה אוטומטית רק כשתוציא תגית גרסה חדשה (למשל v1.0.0)
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest # רץ על Windows כדי לתמוך בסקריפטים שלך
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # כאן אפשר להוסיף פעולות, למשל בדיקת תקינות או אריזה של הסקריפטים שלך
+      - name: Run validation or packaging steps
+        run: |
+          Write-Host "Running automated checks for project..."
+          Get-ChildItem -Recurse
+
+      # יצירת Release אוטומטי בגיטהאב בעת יצירת Tag
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.ps1
+            *.conf
+            *.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
