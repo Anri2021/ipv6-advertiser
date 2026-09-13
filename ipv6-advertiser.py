@@ -68,12 +68,14 @@ _CONFIG_PATH = _resolve_config_path()
 
 _FILE_CONFIG: dict = {}
 
-if _CONFIG_PATH.is_file():
-    try:
-        with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
-            _FILE_CONFIG = json.load(_f)
-    except Exception as _exc:
-        print(f"Warning: Could not read config file {_CONFIG_PATH}: {_exc}", file=sys.stderr)
+if not _CONFIG_PATH.is_file():
+    raise FileNotFoundError(f"Configuration file not found at: {_CONFIG_PATH}")
+
+try:
+    with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
+        _FILE_CONFIG = json.load(_f)
+except Exception as _exc:
+    print(f"Warning: Could not read config file {_CONFIG_PATH}: {_exc}", file=sys.stderr)
 
 
 def _get_setting(env_name: str, conf_key: str, default=None):
