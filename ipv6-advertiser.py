@@ -81,7 +81,7 @@ try:
     with open(_CONFIG_PATH, "r", encoding="utf-8") as _f:
         _FILE_CONFIG = json.load(_f)
 except Exception as _exc:
-    print(f"Warning: Could not read config file {_CONFIG_PATH}: {_exc}", file=sys.stderr)
+    raise RuntimeError(f"Could not parse config file {_CONFIG_PATH}: {_exc}") from _exc
 
 
 def _get_setting(env_name: str, conf_key: str, default=None):
