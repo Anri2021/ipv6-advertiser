@@ -56,6 +56,12 @@ PRESENCE_COOLDOWN = 30.0
 
 # טעינת קובץ תצורה אופציונלי בעל אותו שם של הסקריפט (.conf או .json)
 def _resolve_config_path() -> Path:
+    valid_flags = {"-c", "--conf", "-conf", "--config", "-config", "-configfile", "--configfile"}
+    for arg in sys.argv[1:]:
+        if arg.startswith("-") and arg.lower() not in valid_flags:
+            print(f"Error: Unrecognized parameter '{arg}'", file=sys.stderr)
+            sys.exit(2)
+    
     for idx, arg in enumerate(sys.argv[:-1]):
         if arg.lower() in ("-c", "--conf", "-conf","--config", "-config", "-configfile", "--configfile"):
             return Path(sys.argv[idx + 1]).resolve()
