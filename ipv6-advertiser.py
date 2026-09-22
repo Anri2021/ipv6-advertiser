@@ -188,10 +188,6 @@ GUA_NET: Final = ipaddress.IPv6Network("2000::/3")
 
 ULA_NET: Final = ipaddress.IPv6Network(ULA_PREFIX)
 
-LOCAL_DNS_ADDR: Final = ipaddress.IPv6Address(LOCAL_DNS)
-
-SECONDARY_DNS_ADDR: Final = ipaddress.IPv6Address(SECONDARY_DNS)
-
 # ============================================================
 # 2. Runtime Models
 # ============================================================
@@ -264,7 +260,7 @@ def validate_configuration() -> None:
     if ULA_NET.prefixlen != 64:
         raise RuntimeError("SLAAC with the A flag requires a /64 prefix")
 
-    if LOCAL_DNS_ADDR and ipaddress.IPv6Address(LOCAL_DNS) not in ULA_NET:
+    if LOCAL_DNS and ipaddress.IPv6Address(LOCAL_DNS) not in ULA_NET:
         raise RuntimeError(f"LOCAL_DNS {LOCAL_DNS} is outside {ULA_PREFIX}")
 
     if PREFIX_PREFERRED_LIFETIME > PREFIX_VALID_LIFETIME:
@@ -1132,7 +1128,7 @@ class RouterAdvertisementEngine:
             )
         )
         if DNS_SERVERS:
-            pkt /= ICMPv6NDOptRDNSS(
+            pkt = pkt / ICMPv6NDOptRDNSS(
                 dns=[str(addr) for addr in DNS_SERVERS],
                 lifetime=RDNSS_LIFETIME,
             )
