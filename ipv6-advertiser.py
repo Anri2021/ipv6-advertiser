@@ -121,8 +121,14 @@ else:
 
 # הגדרות רשת מתוך מבנה ה-Network בקונפיגורציה
 ULA_PREFIX = _get_setting("RA_ULA_PREFIX", "Network.UlaPrefix", "fd10:100:104::/64")
-LOCAL_DNS = _get_setting("RA_LOCAL_DNS", "Network.LocalDns", "fd10:100:104::3")
-SECONDARY_DNS = _get_setting("RA_SECONDARY_DNS", "Network.SecondaryDns", "2001:4860:4860::8888")
+LOCAL_DNS = _get_setting("RA_LOCAL_DNS", "Network.LocalDns", None)
+SECONDARY_DNS = _get_setting("RA_SECONDARY_DNS", "Network.SecondaryDns", None)
+
+DNS_SERVERS: list[ipaddress.IPv6Address] = []
+if LOCAL_DNS:
+    DNS_SERVERS.append(ipaddress.IPv6Address(LOCAL_DNS))
+if SECONDARY_DNS:
+    DNS_SERVERS.append(ipaddress.IPv6Address(SECONDARY_DNS))
 
 # דיאגנוסטיקה מתוך מבנה ה-Diagnostics בקונפיגורציה
 _nd_chk = _get_setting("RA_ND_CHECKSUM_DIAGNOSTICS", "Diagnostics.NdChecksum", False)
@@ -258,13 +264,13 @@ def validate_configuration() -> None:
     if ULA_NET.prefixlen != 64:
         raise RuntimeError("SLAAC with the A flag requires a /64 prefix")
 
-    if LOCAL_DNS_ADDR not in ULA_NET:
+    if LOCAL_DNS_ADDR and ipaddress.IPv6Address(LOCAL_DNS) not in ULA_NET:
         raise RuntimeError(f"LOCAL_DNS {LOCAL_DNS} is outside {ULA_PREFIX}")
 
     if PREFIX_PREFERRED_LIFETIME > PREFIX_VALID_LIFETIME:
         raise RuntimeError("Preferred lifetime cannot exceed valid lifetime")
 
-    if not 0 <= RDNSS_LIFETIME <= 0xFFFFFFFF:
+    if DNS_SERVERS and not (0 <= RDNSS_LIFETIME <= 0xFFFFFFFF):
         raise RuntimeError("RDNSS lifetime must fit an unsigned 32-bit value")
 
 
@@ -1111,7 +1117,7 @@ class RouterAdvertisementEngine:
 
     @staticmethod
     def build_ra_packet(binding: InterfaceBinding, destination: Destination):
-        return (
+        pkt = (
             Ether(src=binding.mac, dst=destination.mac)
             / IPv6(src=binding.link_local, dst=destination.ipv6, hlim=255)
             / ICMPv6ND_RA(routerlifetime=0, chlim=0, M=0, O=0)
@@ -1121,14 +1127,16 @@ class RouterAdvertisementEngine:
                 prefixlen=ULA_NET.prefixlen,
                 L=1,
                 A=1,
-                validlifetime=(PREFIX_VALID_LIFETIME),
-                preferredlifetime=(PREFIX_PREFERRED_LIFETIME),
-            )
-            / ICMPv6NDOptRDNSS(
-                dns=[str(LOCAL_DNS_ADDR), str(SECONDARY_DNS_ADDR)],
-                lifetime=RDNSS_LIFETIME,
+                validlifetime=PREFIX_VALID_LIFETIME,
+                preferredlifetime=PREFIX_PREFERRED_LIFETIME,
             )
         )
+        if DNS_SERVERS:
+            pkt /= ICMPv6NDOptRDNSS(
+                dns=[str(addr) for addr in DNS_SERVERS],
+                lifetime=RDNSS_LIFETIME,
+            )
+        return pkt
 
     def _close_sender(self):
         sender, self._send_socket = self._send_socket, None
