@@ -130,6 +130,8 @@ if LOCAL_DNS:
 if SECONDARY_DNS:
     DNS_SERVERS.append(ipaddress.IPv6Address(SECONDARY_DNS))
 
+DYNAMIC_DNS_DISCOVERY: Final = len(DNS_SERVERS) == 0
+
 # דיאגנוסטיקה מתוך מבנה ה-Diagnostics בקונפיגורציה
 _nd_chk = _get_setting("RA_ND_CHECKSUM_DIAGNOSTICS", "Diagnostics.NdChecksum", False)
 ND_CHECKSUM_DIAGNOSTICS = bool(_nd_chk) if isinstance(_nd_chk, bool) else str(_nd_chk).lower() in ("1", "true")
@@ -1375,6 +1377,26 @@ class RouterAdvertisementEngine:
                 return
 
             if ra.routerlifetime > 0:
+                # חילוץ דינמי של שרתי DNS מחבילת ה-RA של הנתב
+                if DYNAMIC_DNS_DISCOVERY and packet.haslayer(ICMPv6NDOptRDNSS):
+                    discovered = []
+                    curr = packet.getlayer(ICMPv6NDOptRDNSS)
+                    while curr:
+                        for dns_ip in getattr(curr, "dns", []):
+                            try:
+                                ip_obj = ipaddress.IPv6Address(dns_ip)
+                                if ip_obj not in discovered:
+                                    discovered.append(ip_obj)
+                            except ValueError:
+                                pass
+                        curr = curr.payload.getlayer(ICMPv6NDOptRDNSS) if curr.payload else None
+
+                    if discovered and discovered != DNS_SERVERS:
+                        DNS_SERVERS.clear()
+                        DNS_SERVERS.extend(discovered)
+                        self._multicast_frame = None
+                        self.log.info("Learned IPv6 DNS servers from router: %s", [str(ip) for ip in discovered])
+                        
                 source_key = f"{src_mac}/{src_ip}"
 
                 if self.permit_primary_ra_followup(source_key):
